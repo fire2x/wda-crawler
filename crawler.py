@@ -6,11 +6,10 @@ import requests
 def fetch_taiwanjobs_courses():
   api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
 
-  # 模擬前端送出的 Payload 條件 (北基宜花金馬分署 BranchID)
+  # 不綁定特定分署 ID，改請求較大的 PageSize 以確保涵蓋所有課程
   payload = {
-      "BranchID": "65723580-2667-4244-9dad-edd015233c87",
       "Page": 1,
-      "PageSize": 50,
+      "PageSize": 200,  # 確保能一次抓回足夠的總筆數進行篩選
   }
 
   headers = {
@@ -22,7 +21,7 @@ def fetch_taiwanjobs_courses():
       "Referer": "https://course.taiwanjobs.gov.tw/",
   }
 
-  print("正在向台灣就業通 Paging API 請求北基宜花金馬分署課程資料...")
+  print("正在向台灣就業通 API 請求課程資料...")
 
   try:
     response = requests.post(api_url, json=payload, headers=headers, timeout=15)
@@ -32,33 +31,36 @@ def fetch_taiwanjobs_courses():
       rows = raw_data.get("rows", [])
       total = raw_data.get("total", 0)
 
-      print(f"API 回應成功！總筆數: {total} 筆，實際取得: {len(rows)} 筆")
+      print(f"API 回應成功！伺服器總筆數: {total} 筆，開始過濾...")
 
       formatted_courses = []
       for item in rows:
-        course = {
-            "id": item.get("ID", ""),
-            "title": item.get("Name", ""),
-            "plan": item.get("PlanName", ""),
-            "branch": item.get("BranchName", ""),
-            # 精準對應訓練單位
-            "training_unit": item.get("TrainingUnit", "北基宜花金馬分署"),
-            "location": (
-                item.get("CourseLocation") or item.get("Address") or "未提供"
-            ),
-            "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}",
-            "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}",
-            "url": item.get("Url", "#"),
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        formatted_courses.append(course)
+        # 使用訓練單位進行精準篩選
+        target_unit = "勞動力發展署北基宜花金馬分署"
+        if item.get("TrainingUnit") == target_unit:
+          course = {
+              "id": item.get("ID", ""),
+              "title": item.get("Name", ""),
+              "plan": item.get("PlanName", ""),
+              "branch": item.get("BranchName", ""),
+              "training_unit": item.get("TrainingUnit", ""),
+              "location": (
+                  item.get("CourseLocation") or item.get("Address") or "未提供"
+              ),
+              "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}",
+              "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}",
+              "url": item.get("Url", "#"),
+              "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+          }
+          formatted_courses.append(course)
 
       # 寫入專案根目錄的 data.json
       with open("data.json", "w", encoding="utf-8") as f:
         json.dump(formatted_courses, f, ensure_ascii=False, indent=4)
 
       print(
-          f"成功！已將 {len(formatted_courses)} 筆真實課程資料寫入 data.json。"
+          f"成功！已篩選並將 {len(formatted_courses)} 筆「{target_unit}」課程資料寫入"
+          " data.json。"
       )
     else:
       print(f"API 請求失敗，狀態碼: {response.status_code}")
