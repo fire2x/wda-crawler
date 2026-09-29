@@ -1,6 +1,5 @@
 from datetime import datetime
 import json
-import time
 import traceback
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -12,35 +11,34 @@ from webdriver_manager.chrome import ChromeDriverManager
 def fetch_courses_with_selenium():
   print("正在初始化無頭瀏覽器 (Selenium)...")
   chrome_options = Options()
-  chrome_options.add_argument("--headless")  # 無畫面模式
+  chrome_options.add_argument("--headless=new")  # 使用最新無頭模式
   chrome_options.add_argument("--no-sandbox")
   chrome_options.add_argument("--disable-dev-shm-usage")
   chrome_options.add_argument("--disable-gpu")
+  chrome_options.add_argument("--disable-software-rasterizer")
+  chrome_options.add_argument("--remote-debugging-port=9222")
   chrome_options.add_argument(
       "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
       " (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
   )
 
-  # 自動下載與配置對應版本的 ChromeDriver
-  driver = webdriver.Chrome(
-      service=Service(ChromeDriverManager().install()), options=chrome_options
-  )
-
+  driver = None
   formatted_courses = []
+
   try:
-    # 台灣就業通課程查詢頁面
+    # 設定啟動逾時
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+
+    # 設定頁面載入逾時（防止無限卡住）
+    driver.set_page_load_timeout(30)
+
     target_url = "https://course.taiwanjobs.gov.tw/"
     print(f"正在連線至目標網頁: {target_url}")
     driver.get(target_url)
 
-    # 等待 JavaScript 非同步載入動態內容
-    print("等待頁面 JavaScript 動態渲染...")
-    time.sleep(5)
-
-    # 取得渲染後的完整 HTML 原始碼
+    # 取得渲染後的 HTML 原始碼
     page_source = driver.page_source
-
-    # 使用 BeautifulSoup 進行精準解析
     soup = BeautifulSoup(page_source, "html.parser")
 
     # 尋找頁面上的課程卡片或相關容器
@@ -53,7 +51,6 @@ def fetch_courses_with_selenium():
         if title_elem:
           title = title_elem.get_text(strip=True)
           if title and len(title) > 3:
-            # 避免重複加入
             if not any(c["title"] == title for c in formatted_courses):
               formatted_courses.append({
                   "id": str(abs(hash(title))),
@@ -93,11 +90,12 @@ def fetch_courses_with_selenium():
     print(f"執行成功！已更新 data.json（共 {len(formatted_courses)} 筆紀錄）。")
 
   except Exception as e:
-    print("❌ Selenium 爬蟲執行發生錯誤：")
+    print("❌ Selenium 爬蟲執行發生錯誤或逾時：")
     traceback.print_exc()
     exit(1)
   finally:
-    driver.quit()
+    if driver:
+      driver.quit()
 
 
 if __name__ == "__main__":
