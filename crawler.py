@@ -1,79 +1,107 @@
 from datetime import datetime
 import json
-from playwright.sync_api import sync_playwright
+import requests
 
 
-def fetch_real_courses():
-  target_courses = []
+def fetch_taiwanjobs_courses():
+  session = requests.Session()
 
-  with sync_playwright() as p:
-    # 啟動無頭瀏覽器
-    browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
+  headers = {
+      "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Content-Type": "application/json;charset=UTF-8",
+      "Origin": "https://course.taiwanjobs.gov.tw",
+      "Referer": "https://course.taiwanjobs.gov.tw/",
+      "User-Agent": (
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"
+          " like Gecko) Chrome/122.0.0.0 Safari/537.36"
+      ),
+  }
+  session.headers.update(headers)
 
-    # 監聽並攔截瀏覽器發出的網路請求，直接抓取後端回傳的 Course/paging JSON
-    def handle_response(response):
-      if "api/Course/paging" in response.url and response.status == 200:
-        try:
-          data = response.json()
-          rows = data.get("rows", [])
-          if rows:
-            for item in rows:
-              # 精準過濾北基宜花金馬分署
-              if item.get("BranchName") == "北基宜花金馬分署" or item.get(
-                  "TrainingUnit"
-              ) == "勞動力發展署北基宜花金馬分署":
-                # 避免重複加入
-                course_id = item.get("ID", "")
-                if not any(c["id"] == course_id for c in target_courses):
-                  target_courses.append({
-                      "id": course_id,
-                      "title": item.get("Name", ""),
-                      "plan": item.get("PlanName", ""),
-                      "branch": item.get("BranchName", "北基宜花金馬分署"),
-                      "training_unit": item.get(
-                          "TrainingUnit", "勞動力發展署北基宜花金馬分署"
-                      ),
-                      "location": (
-                          item.get("CourseLocation")
-                          or item.get("Address")
-                          or "未提供"
-                      ),
-                      "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}",
-                      "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}",
-                      "url": item.get("Url", "#"),
-                      "updated_at": datetime.now().strftime(
-                          "%Y-%m-%d %H:%M:%S"
-                      ),
-                  })
-        except Exception:
-          pass
+  # 先造訪首頁取得 Cookie
+  try:
+    session.get("https://course.taiwanjobs.gov.tw/", timeout=10)
+  except Exception as e:
+    print(f"取得 Cookie 發生警示: {e}")
 
-    page.on("response", handle_response)
+  api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
 
-    print("正在開啟真實瀏覽器前往台灣就業通課程網...")
-    # 前往台灣就業通課程查詢頁面
-    page.goto(
-        "https://course.taiwanjobs.gov.tw/",
-        wait_until="networkidle",
-        timeout=30000,
-    )
+  # 帶入完整的查詢條件，直接指定北基宜花金馬分署的 BranchID
+  payload = {
+      "BranchID": "65723580-2667-4244-9dad-edd015233c87",
+      "PlanID": "",
+      "KeyWord": "",
+      "City": "",
+      "CourseType": 0,
+      "Page": 1,
+      "PageSize": 100,  # 確保能一次抓回所有分署課程
+  }
 
-    # 模擬等待資料完全渲染與 API 請求完成
-    page.wait_for_timeout(5000)
-    browser.close()
+  print("正在向台灣就業通 API 請求北基宜花金馬分署即時課程資料...")
 
-  # 寫入即時抓到的真實資料
-  if target_courses:
-    with open("data.json", "w", encoding="utf-8") as f:
-      json.dump(target_courses, f, ensure_ascii=False, indent=4)
-    print(
-        f"成功！已透過瀏覽器攔截並寫入 {len(target_courses)} 筆「北基宜花金馬分署」真實即時課程資料至"
-        " data.json。"
-    )
-  else:
-    print("⚠️ 警告：未攔截到資料，請確認網頁結構或網路狀態。")
+  try:
+    response = session.post(api_url, json=payload, timeout=15)
+    print(f"HTTP 狀態碼: {response.status_code}")
+
+    if response.status_code == 200:
+      raw_data = response.json()
+      rows = raw_data.get("rows", [])
+      total = raw_data.get("total", 0)
+
+      print(
+          f"API 回應成功！伺服器回傳總筆數: {total} 筆，原始抓取: {len(rows)} 筆"
+      )
+
+      formatted_courses = []
+      target_branch_id = "65723580-2667-4244-9dad-edd015233c87"
+      target_unit = "勞動力發展署北基宜花金馬分署"
+
+      for item in rows:
+        # 嚴格過濾：必須同時符合北基宜花金馬分署的 ID 或訓練單位名稱，絕不混入其他分署
+        item_branch_id = item.get("BranchID", "")
+        item_unit = item.get("TrainingUnit", "")
+        item_branch_name = item.get("BranchName", "")
+
+        if (
+            item_branch_id == target_branch_id
+            or item_unit == target_unit
+            or "北基宜花金馬" in item_branch_name
+        ):
+          course_id = item.get("ID", "")
+          # 避免重複新增
+          if not any(c["id"] == course_id for c in formatted_courses):
+            formatted_courses.append({
+                "id": course_id,
+                "title": item.get("Name", ""),
+                "plan": item.get("PlanName", ""),
+                "branch": item_branch_name or "北基宜花金馬分署",
+                "training_unit": item_unit or target_unit,
+                "location": (
+                    item.get("CourseLocation")
+                    or item.get("Address")
+                    or "未提供"
+                ),
+                "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}",
+                "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}",
+                "url": item.get("Url", "#"),
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            })
+
+      # 寫入 data.json
+      with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(formatted_courses, f, ensure_ascii=False, indent=4)
+
+      print(
+          f"成功！已過濾並將 {len(formatted_courses)} 筆「北基宜花金馬分署」真實即時課程寫入"
+          " data.json。"
+      )
+    else:
+      print(f"API 請求失敗，狀態碼: {response.status_code}")
+
+  except Exception as e:
+    print(f"爬蟲執行發生例外錯誤: {e}")
 
 
 if __name__ == "__main__":
-  fetch_real_courses()
+  fetch_taiwanjobs_courses()
