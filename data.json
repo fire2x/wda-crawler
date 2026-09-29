@@ -9,7 +9,7 @@
         "reg_date": "2025-12-09 ~ 2026-11-20",
         "train_date": "2026-12-06 ~ 2026-12-20",
         "url": "https://its.taiwanjobs.gov.tw/Course/OtherGovDetail?ID=21338",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "b2ae47b3-fc7c-4d2d-be9d-63ec55a5a141",
@@ -21,7 +21,7 @@
         "reg_date": "2026-08-04 ~ 2026-10-31",
         "train_date": "2026-11-09 ~ 2026-11-25",
         "url": "https://its.taiwanjobs.gov.tw/Course/OtherGovDetail?ID=21339",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "d0bada8d-3d92-4991-afd3-d62b61288ee2",
@@ -33,7 +33,7 @@
         "reg_date": "2026-08-04 ~ 2026-09-30",
         "train_date": "2026-10-12 ~ 2026-10-30",
         "url": "https://its.taiwanjobs.gov.tw/Course/OtherGovDetail?ID=21810",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "90322cd0-3b50-4308-b3a7-75f76d5035ef",
@@ -45,7 +45,7 @@
         "reg_date": "2026-08-23 ~ 2026-11-23",
         "train_date": "2026-12-14 ~ 2027-01-15",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158920",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "87b1b452-9ee7-4ae2-b6a1-3d9f81740248",
@@ -57,7 +57,7 @@
         "reg_date": "2026-08-17 ~ 2026-11-09",
         "train_date": "2026-12-01 ~ 2027-03-12",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158844",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "fa724586-fd51-45c6-ab4a-4f2337f3efe7",
@@ -69,7 +69,7 @@
         "reg_date": "2026-08-16 ~ 2026-11-16",
         "train_date": "2026-12-07 ~ 2027-06-25",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158950",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "bae9661d-d445-43d3-9cda-9dca9c8fa63f",
@@ -81,7 +81,7 @@
         "reg_date": "2026-07-27 ~ 2026-10-27",
         "train_date": "2026-11-18 ~ 2027-05-28",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158897",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "f0c462a2-fe87-4670-8253-e5e0a60a2622",
@@ -93,7 +93,7 @@
         "reg_date": "2026-07-14 ~ 2026-10-16",
         "train_date": "2026-11-04 ~ 2027-01-05",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158923",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "fe324c48-3da4-4e70-8be0-50da855bb1bc",
@@ -105,7 +105,7 @@
         "reg_date": "2026-07-14 ~ 2026-10-16",
         "train_date": "2026-10-30 ~ 2027-02-26",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158943",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     },
     {
         "id": "dbead0fa-1da7-494a-9ce1-4847fd748953",
@@ -117,6 +117,6 @@
         "reg_date": "2026-07-06 ~ 2026-10-06",
         "train_date": "2026-10-28 ~ 2027-03-08",
         "url": "https://its.taiwanjobs.gov.tw/Course/Detail?ID=158825",
-        "updated_at": "2026-09-29 04:10:07"
+        "updated_at": "2026-09-29 04:12:13"
     }
 ]
