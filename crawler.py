@@ -4,20 +4,9 @@ import requests
 
 
 def fetch_taiwanjobs_courses():
-  api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+  # 建立一個 Session 物件，用來自動保存與帶入 Cookie
+  session = requests.Session()
 
-  # 帶入完整的預設欄位，避免後端模型繫結失敗
-  payload = {
-      "BranchID": "65723580-2667-4244-9dad-edd015233c87",
-      "PlanID": "",
-      "KeyWord": "",
-      "City": "",
-      "CourseType": 0,
-      "Page": 1,
-      "PageSize": 50,
-  }
-
-  # 模擬真實瀏覽器的完整 Headers（包含 Origin 與 Accept）
   headers = {
       "Accept": "application/json, text/plain, */*",
       "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -30,12 +19,32 @@ def fetch_taiwanjobs_courses():
       ),
   }
 
-  print("正在向台灣就業通 API 發送完整請求...")
+  session.headers.update(headers)
+
+  # 步驟一：先訪問首頁取得伺服器發放的 Cookie / Session
+  print("正在連線至台灣就業通首頁以取得 Cookie...")
+  try:
+    session.get("https://course.taiwanjobs.gov.tw/", timeout=10)
+  except Exception as e:
+    print(f"訪問首頁失敗: {e}")
+
+  # 步驟二：帶著取得的 Cookie 發送 POST 請求
+  api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+
+  payload = {
+      "BranchID": "65723580-2667-4244-9dad-edd015233c87",
+      "PlanID": "",
+      "KeyWord": "",
+      "City": "",
+      "CourseType": 0,
+      "Page": 1,
+      "PageSize": 50,
+  }
+
+  print("正在向 API 請求課程資料...")
 
   try:
-    response = requests.post(
-        api_url, json=payload, headers=headers, timeout=15
-    )
+    response = session.post(api_url, json=payload, timeout=15)
 
     print(f"HTTP 狀態碼: {response.status_code}")
 
@@ -44,7 +53,7 @@ def fetch_taiwanjobs_courses():
       rows = raw_data.get("rows", [])
       total = raw_data.get("total", 0)
 
-      print(f"成功取得！伺服器總筆數: {total} 筆，實際抓到: {len(rows)} 筆")
+      print(f"成功！伺服器總筆數: {total} 筆，實際抓到: {len(rows)} 筆")
 
       formatted_courses = []
       for item in rows:
@@ -68,7 +77,7 @@ def fetch_taiwanjobs_courses():
       with open("data.json", "w", encoding="utf-8") as f:
         json.dump(formatted_courses, f, ensure_ascii=False, indent=4)
 
-      print(f"已成功將 {len(formatted_courses)} 筆資料寫入 data.json。")
+      print(f"已成功將 {len(formatted_courses)} 筆真實資料寫入 data.json。")
     else:
       print(f"請求失敗，回應內容: {response.text}")
 
