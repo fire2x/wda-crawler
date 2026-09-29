@@ -5,7 +5,6 @@ import requests
 
 
 def safe_split_date(val):
-  """安全處理日期欄位，避免 None 或非字串導致 split 崩潰"""
   if val and isinstance(val, str) and "T" in val:
     return val.split("T")[0]
   if val and isinstance(val, str):
@@ -17,7 +16,7 @@ def fetch_north_branch_courses():
   api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
 
   headers = {
-      "Accept": "application/json, text/plain, */*",
+      "Accept": "application/json, text/plain, *,*",
       "Accept-Language": "zh-TW,zh;q=0.9",
       "Content-Type": "application/json;charset=UTF-8",
       "Origin": "https://course.taiwanjobs.gov.tw",
@@ -28,7 +27,7 @@ def fetch_north_branch_courses():
       ),
   }
 
-  payload = {"Page": 1, "PageSize": 300}
+  payload = {"Page": 1, "PageSize": 100}
 
   print("正在向台灣就業通請求課程資料...")
   formatted_courses = []
@@ -43,27 +42,34 @@ def fetch_north_branch_courses():
       print(f"❌ API 請求失敗，狀態碼: {response.status_code}")
       exit(1)
 
-    # 嘗試解析 JSON
-    try:
-      data = response.json()
-    except Exception as json_err:
-      print(f"❌ 解析 JSON 失敗，伺服器可能返回了非 JSON 內容: {json_err}")
-      print(f"回應內容預覽: {response.text[:200]}")
-      exit(1)
-
+    data = response.json()
     rows = data.get("rows", [])
-    print(f"API 總共回傳 {len(rows)} 筆課程，開始進行分署過濾...")
+    print(f"API 總共回傳 {len(rows)} 筆課程。")
+
+    # --- [DEBUG 專用] 印出第一筆資料的完整欄位結構與內容 ---
+    if rows:
+      print("🔍 [DEBUG] 第一筆資料的欄位內容如下：")
+      print(json.dumps(rows[0], ensure_ascii=False, indent=2))
 
     for item in rows:
       if not isinstance(item, dict):
         continue
 
+      # 將所有可能的欄位抓出來檢查
       branch_name = str(item.get("BranchName") or "")
       training_unit = str(item.get("TrainingUnit") or "")
+      org_name = str(item.get("OrgName") or "")
+      plan_name = str(item.get("PlanName") or "")
 
-      # 嚴格過濾：必須屬於北基宜花金馬分署
-      if "北基宜花金馬" in branch_name or "北基宜花金馬" in training_unit:
-        title = item.get("Name")
+      # 擴大過濾條件：只要分署名稱、訓練單位或計畫名稱包含北基宜花金馬，或是直接對應 ID
+      text_to_search = f"{branch_name} {training_unit} {org_name} {plan_name}"
+
+      if (
+          "北基宜花金馬" in text_to_search
+          or "65723580" in text_to_search
+          or "北分署" in text_to_search
+      ):
+        title = item.get("Name") or item.get("CourseName")
         if title:
           course_id = (
               item.get("ID")
@@ -79,7 +85,7 @@ def fetch_north_branch_courses():
           formatted_courses.append({
               "id": str(course_id),
               "title": str(title),
-              "plan": str(item.get("PlanName") or "職前/在職訓練"),
+              "plan": plan_name or "職前/在職訓練",
               "branch": "北基宜花金馬分署",
               "training_unit": training_unit or "勞動力發展署北基宜花金馬分署",
               "location": str(
@@ -96,9 +102,8 @@ def fetch_north_branch_courses():
               "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
           })
 
-    # 防呆機制：若無符合資料，寫入正常狀態確認節點
     if not formatted_courses:
-      print("⚠️ 提示：目前 API 中無符合北基宜花金馬分署的課程，建立確認節點...")
+      print("⚠️ 提示：過濾後仍無符合課程，寫入確認節點...")
       formatted_courses.append({
           "id": "status-check",
           "title": "系統連線正常，目前無北基宜花金馬分署新課程",
@@ -112,14 +117,13 @@ def fetch_north_branch_courses():
           "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
       })
 
-    # 寫入 data.json
     with open("data.json", "w", encoding="utf-8") as f:
       json.dump(formatted_courses, f, ensure_ascii=False, indent=4)
 
-    print(f"執行成功！已將 {len(formatted_courses)} 筆資料寫入 data.json。")
+    print(f"執行成功！已寫入 {len(formatted_courses)} 筆資料至 data.json。")
 
   except Exception as e:
-    print("❌ 執行發生未預期例外錯誤：")
+    print("❌ 執行發生例外錯誤：")
     traceback.print_exc()
     exit(1)
 
