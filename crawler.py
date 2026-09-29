@@ -4,6 +4,15 @@ import traceback
 import requests
 
 
+def safe_split_date(val):
+  """安全處理日期欄位，避免 None 或非字串導致 split 崩潰"""
+  if val and isinstance(val, str) and "T" in val:
+    return val.split("T")[0]
+  if val and isinstance(val, str):
+    return val.split(" ")[0]
+  return val or "-"
+
+
 def fetch_north_branch_courses():
   api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
 
@@ -19,60 +28,75 @@ def fetch_north_branch_courses():
       ),
   }
 
-  # 擴大抓取筆數，確保能從中篩選出北分署課程
-  payload = {"Page": 1, "PageSize": 200}
+  payload = {"Page": 1, "PageSize": 300}
 
-  print("正在向台灣就業通請求課程資料並篩選北基宜花金馬分署...")
+  print("正在向台灣就業通請求課程資料...")
   formatted_courses = []
 
   try:
     response = requests.post(
-        api_url, json=payload, headers=headers, timeout=15
+        api_url, json=payload, headers=headers, timeout=20
     )
-    response.raise_for_status()
+    print(f"API 回應狀態碼: {response.status_code}")
 
-    data = response.json()
+    if response.status_code != 200:
+      print(f"❌ API 請求失敗，狀態碼: {response.status_code}")
+      exit(1)
+
+    # 嘗試解析 JSON
+    try:
+      data = response.json()
+    except Exception as json_err:
+      print(f"❌ 解析 JSON 失敗，伺服器可能返回了非 JSON 內容: {json_err}")
+      print(f"回應內容預覽: {response.text[:200]}")
+      exit(1)
+
     rows = data.get("rows", [])
     print(f"API 總共回傳 {len(rows)} 筆課程，開始進行分署過濾...")
 
     for item in rows:
-      branch_name = item.get("BranchName", "")
-      training_unit = item.get("TrainingUnit", "")
+      if not isinstance(item, dict):
+        continue
 
-      # 嚴格過濾：必須屬於「北基宜花金馬分署」或其所屬訓練場
+      branch_name = str(item.get("BranchName") or "")
+      training_unit = str(item.get("TrainingUnit") or "")
+
+      # 嚴格過濾：必須屬於北基宜花金馬分署
       if "北基宜花金馬" in branch_name or "北基宜花金馬" in training_unit:
-        title = item.get("Name", "")
+        title = item.get("Name")
         if title:
           course_id = (
               item.get("ID")
               or item.get("CourseID")
-              or str(abs(hash(title)))
+              or str(abs(hash(str(title))))
           )
+
+          reg_start = safe_split_date(item.get("RegisterStartDateTime"))
+          reg_end = safe_split_date(item.get("RegisterEndDateTime"))
+          train_start = safe_split_date(item.get("TrainingStartDateTime"))
+          train_end = safe_split_date(item.get("TrainingEndDateTime"))
+
           formatted_courses.append({
               "id": str(course_id),
-              "title": title,
-              "plan": item.get("PlanName", "職前/在職訓練"),
+              "title": str(title),
+              "plan": str(item.get("PlanName") or "職前/在職訓練"),
               "branch": "北基宜花金馬分署",
-              "training_unit": training_unit,
-              "location": (
+              "training_unit": training_unit or "勞動力發展署北基宜花金馬分署",
+              "location": str(
                   item.get("CourseLocation")
                   or item.get("Address")
                   or "新北市五股/泰山/基隆/花蓮訓練場"
               ),
-              "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}".strip(
-                  " ~"
-              ),
-              "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}".strip(
-                  " ~"
-              ),
-              "url": item.get(
-                  "Url",
-                  f"https://its.taiwanjobs.gov.tw/Course/Detail?ID={course_id}",
+              "reg_date": f"{reg_start} ~ {reg_end}".strip(" ~"),
+              "train_date": f"{train_start} ~ {train_end}".strip(" ~"),
+              "url": str(
+                  item.get("Url")
+                  or f"https://its.taiwanjobs.gov.tw/Course/Detail?ID={course_id}"
               ),
               "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
           })
 
-    # 如果篩選後沒有資料，寫入防呆確認節點
+    # 防呆機制：若無符合資料，寫入正常狀態確認節點
     if not formatted_courses:
       print("⚠️ 提示：目前 API 中無符合北基宜花金馬分署的課程，建立確認節點...")
       formatted_courses.append({
@@ -92,10 +116,10 @@ def fetch_north_branch_courses():
     with open("data.json", "w", encoding="utf-8") as f:
       json.dump(formatted_courses, f, ensure_ascii=False, indent=4)
 
-    print(f"篩選完畢！成功寫入 {len(formatted_courses)} 筆北分署課程至 data.json。")
+    print(f"執行成功！已將 {len(formatted_courses)} 筆資料寫入 data.json。")
 
   except Exception as e:
-    print("❌ 執行發生例外錯誤：")
+    print("❌ 執行發生未預期例外錯誤：")
     traceback.print_exc()
     exit(1)
 
