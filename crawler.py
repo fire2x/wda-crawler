@@ -6,12 +6,11 @@ import requests
 def fetch_taiwanjobs_courses():
   api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
 
-  # 模擬前端送出的 Payload 條件
-  # 根據北基宜花金馬分署的 BranchID ("65723580-2667-4244-9dad-edd015233c87") 與相關篩選條件
+  # 模擬前端送出的 Payload 條件 (北基宜花金馬分署 BranchID)
   payload = {
-      "BranchID": "65723580-2667-4244-9dad-edd015233c87",  # 北基宜花金馬分署 ID
+      "BranchID": "65723580-2667-4244-9dad-edd015233c87",
       "Page": 1,
-      "PageSize": 50,  # 設定一次抓取足夠的數量把全部課程包進來
+      "PageSize": 50,
   }
 
   headers = {
@@ -26,7 +25,6 @@ def fetch_taiwanjobs_courses():
   print("正在向台灣就業通 Paging API 請求北基宜花金馬分署課程資料...")
 
   try:
-    # 呼叫 POST API
     response = requests.post(api_url, json=payload, headers=headers, timeout=15)
 
     if response.status_code == 200:
@@ -43,7 +41,8 @@ def fetch_taiwanjobs_courses():
             "title": item.get("Name", ""),
             "plan": item.get("PlanName", ""),
             "branch": item.get("BranchName", ""),
-            "training_unit": item.get("TrainingUnit", ""),
+            # 精準對應訓練單位
+            "training_unit": item.get("TrainingUnit", "北基宜花金馬分署"),
             "location": (
                 item.get("CourseLocation") or item.get("Address") or "未提供"
             ),
