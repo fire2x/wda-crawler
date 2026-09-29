@@ -1,0 +1,45 @@
+name: Run Crawler and Update Data
+
+on:
+  workflow_dispatch: # 允許手動觸發
+  schedule:
+    - cron: '0 0 * * *' # 每天定時執行
+
+jobs:
+  run-crawler:
+    runs-on: ubuntu-latest
+    
+    # 關鍵：賦予 GitHub Actions 讀寫專案的權限
+    permissions:
+      contents: write
+
+    steps:
+      - name: 檢出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安裝套件
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: 執行爬蟲
+        run: python crawler.py
+
+      - name: 自動提交並推送變更
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add data.json
+          
+          # 檢查是否有改變，沒有改變就跳過，有改變才 commit & push
+          if git diff --cached --quiet; then
+            echo "No changes in data.json"
+          else
+            git commit -m "Auto-update scraped data [skip ci]"
+            git push
+          fi
