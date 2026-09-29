@@ -1,7 +1,7 @@
 [
     {
         "id": "status-check",
-        "title": "Selenium 瀏覽器連線正常，等待下次排程",
+        "title": "系統連線正常，等待下次排程同步",
         "plan": "系統狀態",
         "branch": "北基宜花金馬分署",
         "training_unit": "勞動力發展署北基宜花金馬分署",
@@ -9,6 +9,6 @@
         "reg_date": "-",
         "train_date": "-",
         "url": "https://course.taiwanjobs.gov.tw/",
-        "updated_at": "2026-09-29 05:29:04"
+        "updated_at": "2026-09-29 05:34:04"
     }
 ]
