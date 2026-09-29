@@ -1,42 +1,79 @@
+from datetime import datetime
 import json
-import requests
+from playwright.sync_api import sync_playwright
 
 
-def debug_raw_response():
-  session = requests.Session()
+def fetch_real_courses():
+  target_courses = []
 
-  headers = {
-      "Accept": "application/json, text/plain, */*",
-      "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-      "Content-Type": "application/json;charset=UTF-8",
-      "Origin": "https://course.taiwanjobs.gov.tw",
-      "Referer": "https://course.taiwanjobs.gov.tw/",
-      "User-Agent": (
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"
-          " like Gecko) Chrome/122.0.0.0 Safari/537.36"
-      ),
-  }
-  session.headers.update(headers)
+  with sync_playwright() as p:
+    # 啟動無頭瀏覽器
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
 
-  # 先造訪首頁取得 Cookie
-  try:
-    session.get("https://course.taiwanjobs.gov.tw/", timeout=10)
-  except:
-    pass
+    # 監聽並攔截瀏覽器發出的網路請求，直接抓取後端回傳的 Course/paging JSON
+    def handle_response(response):
+      if "api/Course/paging" in response.url and response.status == 200:
+        try:
+          data = response.json()
+          rows = data.get("rows", [])
+          if rows:
+            for item in rows:
+              # 精準過濾北基宜花金馬分署
+              if item.get("BranchName") == "北基宜花金馬分署" or item.get(
+                  "TrainingUnit"
+              ) == "勞動力發展署北基宜花金馬分署":
+                # 避免重複加入
+                course_id = item.get("ID", "")
+                if not any(c["id"] == course_id for c in target_courses):
+                  target_courses.append({
+                      "id": course_id,
+                      "title": item.get("Name", ""),
+                      "plan": item.get("PlanName", ""),
+                      "branch": item.get("BranchName", "北基宜花金馬分署"),
+                      "training_unit": item.get(
+                          "TrainingUnit", "勞動力發展署北基宜花金馬分署"
+                      ),
+                      "location": (
+                          item.get("CourseLocation")
+                          or item.get("Address")
+                          or "未提供"
+                      ),
+                      "reg_date": f"{item.get('RegisterStartDateTime', '').split('T')[0]} ~ {item.get('RegisterEndDateTime', '').split('T')[0]}",
+                      "train_date": f"{item.get('TrainingStartDateTime', '').split('T')[0]} ~ {item.get('TrainingEndDateTime', '').split('T')[0]}",
+                      "url": item.get("Url", "#"),
+                      "updated_at": datetime.now().strftime(
+                          "%Y-%m-%d %H:%M:%S"
+                      ),
+                  })
+        except Exception:
+          pass
 
-  api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+    page.on("response", handle_response)
 
-  # 嘗試最簡單的空白分頁查詢，看看伺服器到底吐出什麼東西
-  payload = {"Page": 1, "PageSize": 10}
+    print("正在開啟真實瀏覽器前往台灣就業通課程網...")
+    # 前往台灣就業通課程查詢頁面
+    page.goto(
+        "https://course.taiwanjobs.gov.tw/",
+        wait_until="networkidle",
+        timeout=30000,
+    )
 
-  print("正在發送除錯請求...")
-  response = session.post(api_url, json=payload, timeout=15)
+    # 模擬等待資料完全渲染與 API 請求完成
+    page.wait_for_timeout(5000)
+    browser.close()
 
-  print(f"HTTP 狀態碼: {response.status_code}")
-  print("--- 伺服器回傳的原始內容開始 ---")
-  print(response.text[:1000])  # 印出前 1000 個字元
-  print("--- 伺服器回傳的原始內容結束 ---")
+  # 寫入即時抓到的真實資料
+  if target_courses:
+    with open("data.json", "w", encoding="utf-8") as f:
+      json.dump(target_courses, f, ensure_ascii=False, indent=4)
+    print(
+        f"成功！已透過瀏覽器攔截並寫入 {len(target_courses)} 筆「北基宜花金馬分署」真實即時課程資料至"
+        " data.json。"
+    )
+  else:
+    print("⚠️ 警告：未攔截到資料，請確認網頁結構或網路狀態。")
 
 
 if __name__ == "__main__":
-  debug_raw_response()
+  fetch_real_courses()
