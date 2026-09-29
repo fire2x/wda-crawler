@@ -1,4 +1,4 @@
-name: Run Course Crawler
+name: Run Selenium Crawler
 
 on:
   schedule:
@@ -23,9 +23,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4
+          pip install selenium beautifulsoup4 webdriver-manager
 
-      - name: Run Crawler Script
+      - name: Run Selenium Crawler Script
         run: python crawler.py
 
       - name: Commit and push if data changed
@@ -36,6 +36,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to data.json"
           else
-            git commit -m "Auto-update course data.json"
+            git commit -m "Auto-update course data.json via Selenium"
             git push
           fi
