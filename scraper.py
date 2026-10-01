@@ -2,86 +2,72 @@ import requests
 import json
 import math
 import time
+import os
 
-# API 端點與偽裝標頭
-URL = "https://course.taiwanjobs.gov.tw/api/Course/paging"
-HEADERS = {
-    "Content-Type": "application/json;charset=UTF-8",
-    "Accept": "application/json, text/plain, */*",
-    "Origin": "https://course.taiwanjobs.gov.tw",
-    "Referer": "https://course.taiwanjobs.gov.tw/course/conditions",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-
-def fetch_courses():
-    """
-    抓取並整合所有分頁的課程資料，並根據 SourcePrimaryKey 去除重複項。
-    """
-    all_courses = {}  # 使用字典以 SourcePrimaryKey 為鍵，方便去重
-    page_size = 10    # 伺服器預設的每頁筆數
-    current_page = 1
+def run_scraper():
+    # 使用 Session 自動維護 Cookie
+    session = requests.Session()
     
-    print("🚀 開始抓取北基宜花金馬分署課程...")
+    # 完整的現代瀏覽器標頭
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Origin": "https://course.taiwanjobs.gov.tw",
+        "Referer": "https://course.taiwanjobs.gov.tw/course/conditions"
+    }
+    
+    print("🌐 步驟 1: 正在造訪就業通首頁以獲取認證 Cookie...")
+    try:
+        home_res = session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=headers, timeout=15)
+        print(f"首頁連線狀態: {home_res.status_code}, 取得 Cookie: {list(session.cookies.get_dict().keys())}")
+    except Exception as e:
+        print(f"⚠️ 首頁連線失敗 (可能海外 IP 被擋): {e}")
 
-    while True:
+    # 步驟 2: 發送 API 請求
+    api_url = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+    all_courses = []
+    
+    for page in [1, 2]:
         payload = {
-            "PageIndex": current_page,
-            "PageSize": page_size,
+            "PageIndex": page,
+            "PageSize": 10,
             "TrainingUnit": "北基宜花金馬分署",
             "Keyword": "",
             "CourseType": None,
             "City": None
         }
         
+        print(f"\n📡 步驟 2.{page}: 請求第 {page} 頁資料...")
         try:
-            print(f"🔄 正在抓取第 {current_page} 頁...")
-            response = requests.post(URL, json=payload, headers=HEADERS, timeout=30)
-            response.raise_for_status()  # 如果請求失敗 (非 200)，則拋出異常
+            res = session.post(api_url, json=payload, headers=headers, timeout=20)
+            print(f"API 回應狀態碼: {res.status_code}")
             
-            data = response.json()
-            rows = data.get("rows", [])
-            
-            if not rows:
-                print("✅ 已無更多課程資料，抓取完畢。")
-                break
-            
-            # 處理並去重
-            for course in rows:
-                # SourcePrimaryKey 是最可靠的唯一識別碼
-                unique_id = course.get("SourcePrimaryKey")
-                if unique_id not in all_courses:
-                    all_courses[unique_id] = course
-            
-            # 判斷是否還有下一頁
-            total_courses = data.get("total", 0)
-            total_pages = math.ceil(total_courses / page_size)
-            
-            if current_page >= total_pages:
-                print("✅ 已達最後一頁，抓取完畢。")
-                break
+            if res.status_code == 200:
+                data = res.json()
+                rows = data.get("rows", [])
+                total = data.get("total", 0)
+                print(f"成功取得第 {page} 頁，筆數: {len(rows)} (總數: {total})")
                 
-            current_page += 1
-            time.sleep(1)  # 友善爬取，每次請求間隔 1 秒
-
-        except requests.exceptions.RequestException as e:
-            print(f"❌ 網路請求失敗: {e}")
+                all_courses.extend(rows)
+                if len(all_courses) >= total or not rows:
+                    break
+            else:
+                print(f"❌ API 回應異常: {res.text[:300]}")
+                break
+        except Exception as e:
+            print(f"❌ 請求出錯: {e}")
             break
             
-    # 將去重後的課程從字典的值中取出
-    final_courses = list(all_courses.values())
-    print(f"\n🎉 成功抓取並去重，共獲得 {len(final_courses)} 門不重複的課程。")
-    return final_courses
+        time.sleep(1)
 
-def save_to_json(courses):
-    """
-    將課程資料儲存為 courses.json。
-    """
-    filename = "courses.json"
-    with open(filename, 'w', encoding='utf-8') as f:
-        # ensure_ascii=False 確保中文字能正確顯示，而不是被轉成 \uXXXX
-        json.dump(courses, f, ensure_ascii=False, indent=4)
-    print(f"💾 資料已成功儲存至 {filename}")
+    # 步驟 3: 防呆保護（如果這次爬蟲被海外擋掉拿到 0 筆，絕對不要把原本舊的檔案覆蓋成空的！）
+    if len(all_courses) > 0:
+        with open("courses.json", "w", encoding="utf-8") as f:
+            json.dump(all_courses, f, ensure_ascii=False, indent=2)
+        print(f"\n🎉 成功更新 courses.json，共寫入 {len(all_courses)} 筆資料！")
+    else:
+        print("\n⚠️ 本次抓取結果為 0 筆！啟動保護機制：保留既有 courses.json 檔案，不進行覆蓋。")
 
 if __name__ == "__main__":
-    courses_data = fetch_courses()
-  
+    run_scraper()
