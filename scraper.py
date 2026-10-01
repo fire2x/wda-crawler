@@ -30,8 +30,8 @@ def fetch_all_courses():
     except Exception as e:
         print(f"⚠️ 首頁連線暫時失敗，將直接連線 API: {e}")
 
-    # 💡 【核心重磅改進】：無視 total 判斷，直接無條件暴力跑 3 頁，徹底杜絕翻頁中斷 Bug
-    for current_page in:
+    # 💡 【核心修復】：修正為正確的 Python 循環語法，無條件暴力掃描前 3 頁
+    for current_page in [1, 2, 3]:
         payload = {
             "PageIndex": current_page,
             "pageIndex": current_page,
@@ -53,7 +53,7 @@ def fetch_all_courses():
                 
             res_data = response.json()
             
-            # 💡 【核心相容處理】：自動解析 rows (物件) 或是直接為陣列
+            # 自動解析 rows (物件) 或是直接為陣列
             rows = []
             if isinstance(res_data, list):
                 rows = res_data
@@ -91,21 +91,3 @@ def fetch_all_courses():
             print(f"❌ 請求第 {current_page} 頁時發生異常: {e}")
             continue
 
-    return list(all_courses.values())
-
-def main():
-    courses = fetch_all_courses()
-    print(f"\n📊 最終統計：三頁合併去重後，共獲得 {len(courses)} 門不重複的完整課程！")
-    
-    filename = "courses.json"
-    
-    # 寫入保護機制
-    if len(courses) > 0:
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(courses, f, ensure_ascii=False, indent=2)
-        print(f"💾 已成功寫入 {filename} (檔案大小: {os.path.getsize(filename)} bytes)")
-    else:
-        print("⚠️ 爬取結果為 0 筆，不覆蓋舊檔案，保護網頁不為空。")
-
-if __name__ == "__main__":
-    main()
