@@ -3,91 +3,79 @@ import json
 import time
 import os
 
-# 100% 正確的課程查詢端點
+# API 端點與偽裝標頭
 URL = "https://course.taiwanjobs.gov.tw/api/Course/paging"
-
-# 完整的瀏覽器偽裝標頭
 HEADERS = {
     "Content-Type": "application/json;charset=UTF-8",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
     "Origin": "https://course.taiwanjobs.gov.tw",
     "Referer": "https://course.taiwanjobs.gov.tw/course/conditions",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
 def fetch_all_courses():
+    """
+    全自動、不設限地抓取所有分頁課程，並在最後進行統一去重。
+    """
     session = requests.Session()
-    all_courses = {}
-    seen_signatures = set()
+    all_raw_courses = []
+    current_page = 1
+    empty_page_attempts = 0 # 連續空頁面嘗試次數
 
-    print("🌐 步驟 1: 造訪首頁以獲取認證 Cookie...")
+    print("🚀 啟動終極自動翻頁爬蟲...")
+    
+    # 步驟 1: 嘗試訪問首頁以獲取 Session Cookie
     try:
-        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=15)
-    except Exception as e:
-        print(f"⚠️ 首頁連線暫時失敗，將直接連線 API: {e}")
+        print("🌐 正在訪問首頁以建立連線...")
+        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=20)
+        print("✅ 首頁連線成功，已取得 Session。")
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️ 首頁連線失敗 (錯誤: {e})，將直接嘗試 API 連線...")
 
-    # 💡 【核心修復】：修正為正確的 Python 循環語法，無條件暴力掃描前 3 頁
-    for current_page in [1, 2, 3]:
+    # 步驟 2: 無限循環翻頁，直到連續抓不到資料為止
+    while True:
         payload = {
             "PageIndex": current_page,
-            "pageIndex": current_page,
+            "pageIndex": current_page, # 兼容大小寫參數
             "PageSize": 10,
             "pageSize": 10,
             "TrainingUnit": "北基宜花金馬分署",
-            "Keyword": "",
-            "CourseType": None,
-            "City": None
+            "Keyword": "", "CourseType": None, "City": None
         }
 
         try:
-            print(f"\n📡 正在發送第 {current_page} 頁 API 請求...")
-            response = session.post(URL, json=payload, headers=HEADERS, timeout=20)
-            
+            print(f"\n🔄 正在請求第 {current_page} 頁資料...")
+            response = session.post(URL, json=payload, headers=HEADERS, timeout=30)
+
             if response.status_code != 200:
-                print(f"❌ 第 {current_page} 頁連線失敗 (狀態碼: {response.status_code})")
-                continue
-                
-            res_data = response.json()
+                print(f"❌ 第 {current_page} 頁請求失敗，狀態碼: {response.status_code}。中止爬取。")
+                break
+
+            data = response.json()
             
-            # 自動解析 rows (物件) 或是直接為陣列
+            # 兼容 API 可能返回的兩種 JSON 結構
             rows = []
-            if isinstance(res_data, list):
-                rows = res_data
-            elif isinstance(res_data, dict):
-                rows = res_data.get("rows", [])
+            if isinstance(data, list):
+                rows = data
+            elif isinstance(data, dict):
+                rows = data.get("rows", [])
             
-            print(f"✅ 第 {current_page} 頁成功解析出 {len(rows)} 筆原始課程資料")
-            
-            if not rows:
-                print(f"ℹ️ 第 {current_page} 頁沒有任何課程資料，結束本頁爬取。")
-                continue
-                
-            print(f"   📢 本頁首門課程名稱: {rows[0].get('Name')}")
-            
-            # 逐筆解析並精確去重
-            for item in rows:
-                course_name = (item.get("Name") or "").strip()
-                address = (item.get("Address") or "").strip()
-                plan_name = (item.get("PlanName") or "").strip()
-                
-                # 指紋去重簽章：課程名稱 + 計畫類型 + 上課地址
-                signature = f"{course_name}@{plan_name}@{address}"
-                
-                if signature not in seen_signatures:
-                    seen_signatures.add(signature)
-                    # 優先使用唯一的 ID 作為物件 key
-                    key = item.get("ID") or item.get("SourcePrimaryKey") or course_name
-                    all_courses[key] = item
-                else:
-                    print(f"   ⚠️ 過濾掉完全重複之項目: {course_name}")
+            if rows:
+                print(f"✅ 第 {current_page} 頁成功獲取 {len(rows)} 筆原始資料。")
+                all_raw_courses.extend(rows)
+                current_page += 1
+                empty_page_attempts = 0 # 重置空頁面計數器
+            else:
+                print(f"ℹ️ 第 {current_page} 頁無資料，計為一次空頁面。")
+                empty_page_attempts += 1
+                # 如果連續 2 次都抓不到資料，我們才認定真的結束了
+                if empty_page_attempts >= 2:
+                    print("🏁 連續兩次請求為空，確認所有頁面已抓取完畢。")
+                    break
+                current_page += 1 # 即使是空頁也繼續嘗試下一頁
 
-            time.sleep(1.5) # 友善延遲
+            time.sleep(1.5) # 友善爬取，避免請求過於頻繁
 
-        except Exception as e:
-            print(f"❌ 請求第 {current_page} 頁時發生異常: {e}")
-            continue
-
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 請求過程中發生網路錯誤: {e}。中止爬取。")
+            break
