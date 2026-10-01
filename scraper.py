@@ -22,13 +22,11 @@ HEADERS = {
 
 def fetch_all_courses():
     session = requests.Session()
-    all_courses = {}  # 用來存放去重後的資料庫
+    all_courses = {}       # 最終合併去重的課程
     current_page = 1
-    page_size = 10  # 遵守伺服器限制
-
-    # 為了高強度去重，建立一個追蹤集合
-    # 同一門課如果名稱完全一樣，且上課地點也一致，我們視為重複
-    seen_signatures = set()
+    page_size = 10         # 遵循伺服器的強制預設限制
+    
+    seen_signatures = set()  # 同一門課如果名稱完全一樣，且上課地點也一致，我們視為重複
 
     print("🌐 步驟 1: 造訪首頁以獲取認證 Cookie...")
     try:
@@ -56,7 +54,7 @@ def fetch_all_courses():
                 break
                 
             data = response.json()
-            total = data.get("total", 0)
+            total = data.get("total", 0)  # 網頁查到的總筆數 (例如 19)
             rows = data.get("rows", [])
             
             print(f"✅ 第 {current_page} 頁成功拿到 {len(rows)} 筆原始資料")
@@ -68,25 +66,26 @@ def fetch_all_courses():
                 course_name = (item.get("Name") or "").strip()
                 address = (item.get("Address") or "").strip()
                 
-                # 💡 【終極去重核心邏輯】：
-                # 如果「課程名稱」與「上課地址」皆完全相同，則判定為重複課程（例如青年專班與一般職前重複上架）
+                # 💡 【高精準去重】：如果「課程名稱」與「上課地址」皆完全相同，則判定為重複課程
                 signature = f"{course_name}@{address}"
                 
                 if signature not in seen_signatures:
                     seen_signatures.add(signature)
-                    # 使用唯一識別碼當做 Key
                     key = item.get("SourcePrimaryKey") or item.get("ID") or course_name
                     all_courses[key] = item
                 else:
                     print(f"⚠️ 偵測到重複課程並自動過濾：{course_name}")
 
+            # 💡 【終極不設限解除邏輯】：根據總筆數自動計算最大頁數，不漏掉任何一頁！
             total_pages = math.ceil(total / page_size)
+            print(f"📊 目前進度: 已完成 {current_page}/{total_pages} 頁")
+            
             if current_page >= total_pages:
-                print("🏁 所有分頁已請求完畢！")
+                print("🏁 所有分頁已順利請求完畢！")
                 break
                 
             current_page += 1
-            time.sleep(1) # 禮貌延遲
+            time.sleep(1) # 禮貌延遲，避免被防火牆擋掉
 
         except Exception as e:
             print(f"⚠️ 請求過程發生異常: {e}")
@@ -96,7 +95,7 @@ def fetch_all_courses():
 
 def main():
     courses = fetch_all_courses()
-    print(f"\n📊 去重結果：原始課程中過濾掉重複項目，最終保留 {len(courses)} 門不重複課程。")
+    print(f"\n📊 最終統計：去除重複項目後，最終保留 {len(courses)} 門課程（不設限全部呈現）。")
     
     filename = "courses.json"
     
@@ -104,7 +103,7 @@ def main():
     if len(courses) > 0:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(courses, f, ensure_ascii=False, indent=2)
-        print(f"💾 成功將 {len(courses)} 筆乾淨資料寫入 {filename}")
+        print(f"💾 成功將 {len(courses)} 筆乾淨且完整的課程資料寫入 {filename}")
     else:
         print("⚠️ 未取得任何資料，保留既有檔案不予覆蓋。")
 
