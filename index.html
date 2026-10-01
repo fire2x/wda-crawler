@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北基宜花金馬分署 - 最新課程</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>勞動力發展署北基宜花金馬分署 - 最新課程清單</h1>
+        <p>此頁面資料由 GitHub Actions 每日自動更新。</p>
+    </header>
+
+    <main id="course-container">
+        <p class="loading">正在載入最新課程資料...</p>
+    </main>
+    
+    <footer>
+        <p>資料來源：<a href="https://course.taiwanjobs.gov.tw/" target="_blank">台灣就業通-職訓整合網</a></p>
+        <p id="last-updated"></p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('course-container');
+            const lastUpdatedElem = document.getElementById('last-updated');
+
+            // 使用 fetch API 讀取 JSON 檔案
+            fetch('courses.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`網路回應錯誤，狀態碼: ${response.status}`);
+                    }
+                    // 獲取最後修改時間並顯示
+                    const lastModified = response.headers.get('Last-Modified');
+                    if (lastModified) {
+                        lastUpdatedElem.textContent = `最後更新時間：${new Date(lastModified).toLocaleString()}`;
+                    }
+                    return response.json();
+                })
+                .then(courses => {
+                    container.innerHTML = ''; // 清空載入中訊息
+
+                    if (courses.length === 0) {
+                        container.innerHTML = '<p>目前沒有找到任何課程。</p>';
+                        return;
+                    }
+
+                    courses.forEach(course => {
+                        const card = document.createElement('div');
+                        card.className = 'course-card';
+
+                        // 處理日期格式
+                        const regEndDate = course.RegisterEndDateTime ? course.RegisterEndDateTime.split('T')[0] : '無資料';
+
+                        card.innerHTML = `
+                            <h3>${course.Name}</h3>
+                            <div class="course-meta">
+                                <span class="tag type-${course.CourseType}">${course.CourseTypeName || '未知'}</span>
+                                <span class="tag">${course.PlanName}</span>
+                            </div>
+                            <p><strong>上課地點：</strong> ${course.CityName} - ${course.Address}</p>
+                            <p><strong>報名截止：</strong> <span class="deadline">${regEndDate}</span></p>
+                            <a href="${course.Url}" target="_blank" class="details-button">查看詳情</a>
+                        `;
+                        container.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('讀取課程資料時發生錯誤:', error);
+                    container.innerHTML = `<p class="error">載入課程失敗！請稍後再試。</p>`;
+                });
+        });
+    </script>
+
+</body>
+</html>
