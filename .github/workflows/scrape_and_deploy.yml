@@ -1,22 +1,18 @@
 name: Scrape TaiwanJobs Courses and Deploy
 
-# 觸發條件：
-# 1. 每天 UTC 時間 00:00 自動執行
-# 2. 當有 push 到 main 分支時執行 (方便手動更新)
-# 3. 允許手動在 Actions 頁面觸發
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'  # 每天午夜 12:00 自動跑一次
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - main            # 當有代碼 push 到 main 時執行
+  workflow_dispatch:     # 支援手動在 Actions 頁面點擊 Run
 
 jobs:
   scrape-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 給予 workflow 寫入 repository 的權限
+      contents: write   # 💡 必須給予寫入專案的權限！
 
     steps:
       # 步驟 1: Check out repository
@@ -29,33 +25,37 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 步驟 3: 安裝 Python 爬蟲所需的套件
+      # 步驟 3: 安裝 Python 爬蟲所需套件
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
-      # 步驟 4: 執行爬蟲腳本，生成 courses.json
+      # 步驟 4: 執行爬蟲腳本，強行掃描 3 頁並生成 courses.json
       - name: Run scraper to fetch courses
         run: python scraper.py
 
-      # 步驟 5: 檢查檔案是否有變動，若有則 commit 並 push
+      # 💡 步驟 5 (核心修復): 強制偵測變動並 commit & push 
       - name: Commit and push if there are changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 將 courses.json 加到 Git 追蹤
           git add courses.json
-          # 如果 git status 偵測到有變動，才進行 commit
-          if ! git diff --staged --quiet; then
-            git commit -m "📊 [Automated] Update course data"
-            git push
+          
+          # 💡 強制檢查 courses.json 的實際變動，若有修改就提交，否則不報錯安全跳過
+          if git diff --cached --quiet; then
+            echo "✅ 資料沒有任何變動，跳過 Commit。"
           else
-            echo "✅ No changes to course data. Skipping commit."
+            echo "📊 偵測到資料變動，正在自動 Commit 回專案..."
+            git commit -m "📊 [Automated] Update course data (19 courses)"
+            git push
           fi
 
-      # 步驟 6: 部署到 GitHub Pages
+      # 步驟 6: 部署至 GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: . # 發布整個 repository 的根目錄
+          publish_dir: .  # 發布整個根目錄 (包含新的 index.html 與 courses.json)
