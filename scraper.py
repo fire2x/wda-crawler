@@ -3,8 +3,10 @@ import json
 import time
 import os
 
-# API 端點與偽裝標頭
+# 台灣就業通核心分頁 API
 URL = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+
+# 完整的瀏覽器身分偽裝 Headers
 HEADERS = {
     "Content-Type": "application/json;charset=UTF-8",
     "Accept": "application/json, text/plain, */*",
@@ -14,68 +16,93 @@ HEADERS = {
 }
 
 def fetch_all_courses():
-    """
-    全自動、不設限地抓取所有分頁課程，並在最後進行統一去重。
-    """
     session = requests.Session()
-    all_raw_courses = []
+    all_courses = {}
+    seen_signatures = set()
     current_page = 1
-    empty_page_attempts = 0 # 連續空頁面嘗試次數
+    page_size = 10  # 遵循政府 API 每頁 10 筆的硬性上限
 
-    print("🚀 啟動終極自動翻頁爬蟲...")
-    
-    # 步驟 1: 嘗試訪問首頁以獲取 Session Cookie
+    print("🌐 步驟 1: 建立安全 Session 連線...")
     try:
-        print("🌐 正在訪問首頁以建立連線...")
-        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=20)
-        print("✅ 首頁連線成功，已取得 Session。")
-    except requests.exceptions.RequestException as e:
-        print(f"⚠️ 首頁連線失敗 (錯誤: {e})，將直接嘗試 API 連線...")
+        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=15)
+    except Exception as e:
+        print(f"⚠️ 初始連線超時，嘗試直連 API: {e}")
 
-    # 步驟 2: 無限循環翻頁，直到連續抓不到資料為止
+    print("\n🚀 步驟 2: 開始自動翻頁爬取北基宜花金馬分署所有課程...")
+    
     while True:
+        # 💡 大小寫雙重參數發送，完美相容後端解析
         payload = {
             "PageIndex": current_page,
-            "pageIndex": current_page, # 兼容大小寫參數
-            "PageSize": 10,
-            "pageSize": 10,
+            "pageIndex": current_page,
+            "PageSize": page_size,
+            "pageSize": page_size,
             "TrainingUnit": "北基宜花金馬分署",
-            "Keyword": "", "CourseType": None, "City": None
+            "Keyword": "",
+            "CourseType": None,
+            "City": None
         }
 
         try:
-            print(f"\n🔄 正在請求第 {current_page} 頁資料...")
-            response = session.post(URL, json=payload, headers=HEADERS, timeout=30)
-
+            print(f"🔄 正在爬取第 {current_page} 頁...")
+            response = session.post(URL, json=payload, headers=HEADERS, timeout=15)
+            
             if response.status_code != 200:
-                print(f"❌ 第 {current_page} 頁請求失敗，狀態碼: {response.status_code}。中止爬取。")
+                print(f"❌ 請求失敗，狀態碼: {response.status_code}")
                 break
-
-            data = response.json()
+                
+            res_data = response.json()
             
-            # 兼容 API 可能返回的兩種 JSON 結構
+            # 相容 API 可能回傳的兩種結構（物件 rows 或純陣列）
             rows = []
-            if isinstance(data, list):
-                rows = data
-            elif isinstance(data, dict):
-                rows = data.get("rows", [])
+            if isinstance(res_data, list):
+                rows = res_data
+            elif isinstance(res_data, dict):
+                rows = res_data.get("rows", [])
             
-            if rows:
-                print(f"✅ 第 {current_page} 頁成功獲取 {len(rows)} 筆原始資料。")
-                all_raw_courses.extend(rows)
-                current_page += 1
-                empty_page_attempts = 0 # 重置空頁面計數器
-            else:
-                print(f"ℹ️ 第 {current_page} 頁無資料，計為一次空頁面。")
-                empty_page_attempts += 1
-                # 如果連續 2 次都抓不到資料，我們才認定真的結束了
-                if empty_page_attempts >= 2:
-                    print("🏁 連續兩次請求為空，確認所有頁面已抓取完畢。")
-                    break
-                current_page += 1 # 即使是空頁也繼續嘗試下一頁
+            if not rows:
+                print("🏁 抓取完畢：本頁無資料，已到達最後一頁。")
+                break
+                
+            print(f"✅ 第 {current_page} 頁解析成功！取得 {len(rows)} 筆原始課程")
+            
+            # 進行精準去重與合併
+            for item in rows:
+                course_name = (item.get("Name") or "").strip()
+                address = (item.get("Address") or "").strip()
+                plan_name = (item.get("PlanName") or "").strip()
+                
+                # 💡 指紋去重設計：如果課程名稱、計畫和地點都一樣，判定為重複上架（如青年專班與職前重複）
+                signature = f"{course_name}@{plan_name}@{address}"
+                
+                if signature not in seen_signatures:
+                    seen_signatures.add(signature)
+                    # 優先使用唯一的 ID
+                    key = item.get("ID") or item.get("SourcePrimaryKey") or course_name
+                    all_courses[key] = item
+                else:
+                    print(f"   ⚠️ 偵測到重複課程並自動過濾：{course_name}")
 
-            time.sleep(1.5) # 友善爬取，避免請求過於頻繁
+            current_page += 1
+            time.sleep(1)  # 禮貌延遲
 
-        except requests.exceptions.RequestException as e:
-            print(f"❌ 請求過程中發生網路錯誤: {e}。中止爬取。")
+        except Exception as e:
+            print(f"⚠️ 請求過程發生異常 (可能是海外 IP 逾時): {e}")
             break
+
+    return list(all_courses.values())
+
+def main():
+    courses = fetch_all_courses()
+    filename = "courses.json"
+    
+    # 💡 終極安全防護：只有在確定拿到資料時才覆蓋 JSON，避免把網頁洗成空白
+    if len(courses) > 0:
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(courses, f, ensure_ascii=False, indent=2)
+        print(f"\n🎉 完美成功！已將不重複的 {len(courses)} 門課程完整寫入 {filename}")
+    else:
+        print("\n⚠️ 抓取結果為 0 筆！啟動安全保護：保留原既有資料，不覆蓋 courses.json。")
+
+if __name__ == "__main__":
+    main()
