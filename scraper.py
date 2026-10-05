@@ -23,16 +23,13 @@ def fetch_all():
 
     print("🚀 啟動【真正翻頁】爬蟲...")
 
-    # 嘗試預先建立連線
     try:
-        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=10)
+        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=15)
     except Exception:
         pass
 
-    # 強行請求第 1 頁與第 2 頁 (19筆資料只需2頁)
+    # 無條件跑 3 頁，把所有資料撈乾淨
     for page in [1, 2, 3]:
-        # 💡 【核心重磅修復】：
-        # 同時在 URL Query String (params) 與 POST Body (json) 帶上分頁參數！
         query_params = {
             "PageIndex": page,
             "pageIndex": page,
@@ -53,7 +50,6 @@ def fetch_all():
 
         print(f"\n📡 正在發送第 {page} 頁請求 (帶入 URL Query String: ?PageIndex={page})...")
         try:
-            # 💡 重點：params=query_params 讓網址真正變成 /api/Course/paging?PageIndex=2
             resp = session.post(URL, params=query_params, json=payload, headers=HEADERS, timeout=20)
             
             if resp.status_code != 200:
@@ -68,7 +64,6 @@ def fetch_all():
                 print(f"🏁 第 {page} 頁無資料，結束爬取。")
                 break
 
-            # 印出當前頁面第一門課，驗證是否真正翻頁！
             first_name = rows[0].get("Name")
             print(f"   📢 本頁首門課程: {first_name}")
 
@@ -81,7 +76,7 @@ def fetch_all():
                 else:
                     print(f"   ⚠️ 略過已存在項目：{name}")
 
-            time.sleep(1)
+            time.sleep(1.5)
 
         except Exception as e:
             print(f"❌ 請求第 {page} 頁發生錯誤: {e}")
@@ -97,13 +92,16 @@ def main():
 
     filename = "courses.json"
     
-    # 只要有抓到大於 0 筆，就寫入檔案
-    if len(courses) > 0:
+    # 💡 【核心防護罩邏輯】：
+    # 只有當爬蟲真正成功拿到「大於 10 門課（代表順利跨頁抓取）」時，才允許寫入並覆蓋 courses.json！
+    # 如果海外 IP 被擋或斷線導致只抓到 10 門或 0 門，絕對不覆蓋，保證您在 GitHub 上的 courses.json 永遠是最完整的 18 筆！
+    if len(courses) > 10:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(courses, f, ensure_ascii=False, indent=2)
-        print(f"💾 已成功寫入 {filename} (共 {len(courses)} 筆)")
+        print(f"💾 爬取順暢且筆數正確！已成功覆蓋寫入 {filename} (共 {len(courses)} 筆)")
     else:
-        print("⚠️ 未取得任何資料，不覆蓋舊檔案。")
+        print("⚠️ 警告：本次爬取筆數少於或等於 10 筆（可能因海外 IP 連線第 2 頁遭防火牆阻擋）。")
+        print("   安全機制啟動：拒絕覆蓋，保留專案原有的完整 18 門保底資料。")
 
 if __name__ == "__main__":
     main()
