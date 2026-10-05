@@ -49,7 +49,7 @@ jobs:
             echo "✅ 資料沒有任何變動，跳過 Commit。"
           else
             echo "📊 偵測到資料變動，正在自動 Commit 回專案..."
-            git commit -m "📊 [Automated] Update course data (19 courses)"
+            git commit -m "📊 [Automated] Update course data"
             git push
           fi
 
