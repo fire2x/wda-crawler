@@ -363,8 +363,8 @@
                     regStatsHtml = `
                         <div class="reg-stats-box">
                             <div class="reg-stats-header">
-                                <span>🔥 目前報名：<strong style="color:var(--primary); font-size:1rem;">\${count}</strong> 人 (限額 \${limit} 人)</span>
-                                <span class="reg-badge \${badgeClass}">\${badgeLabel}</span>
+                                <span>🔥 目前報名：<strong style="color:var(--primary); font-size:1rem;">${count}</strong> 人 (限額 ${limit} 人)</span>
+                                <span class="reg-badge ${badgeClass}">${badgeLabel}</span>
                             </div>
                         </div>
                     `;
@@ -387,7 +387,7 @@
                         <div class="reg-stats-box">
                             <div class="reg-stats-header">
                                 <span>💼 招訓名額：<strong style="color:var(--primary); font-size:1rem;">${limit}</strong> 人</span>
-                                <span class="reg-badge \${badgeClass}">\${badgeLabel}</span>
+                                <span class="reg-badge ${badgeClass}">${badgeLabel}</span>
                             </div>
                         </div>
                     `;
@@ -406,4 +406,36 @@
                 return `
                     <div class="course-card">
                         <div class="card-header">
-                            <span class="type-tag ${typeC
+                            <span class="type-tag ${typeClass}">${displayTypeName}</span>
+                            ${statusBadge}
+                        </div>
+                        <h3 class="course-name">${c.Name}</h3>
+                        
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="info-label">📍 上課地點：</span>
+                                <span class="info-value">${c.CityName || ''} - ${c.Address || '依簡章為準'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">📅 報名期間：</span>
+                                <span class="info-value">${regStart} ~ ${regEnd}</span>
+                            </div>
+                            
+                            ${regStatsHtml}
+
+                            <div class="urgency-row">
+                                ⏱️ ${daysLeftText}
+                            </div>
+                            ${hotwordHtml ? `<div class="hotword-group">${hotwordHtml}</div>` : ''}
+                        </div>
+
+                        <div class="card-footer">
+                            <a href="${c.Url}" target="_blank" class="detail-btn">查看官方簡章 / 立即報名 ➔</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
