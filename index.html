@@ -39,7 +39,7 @@
         .kpi-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
         .kpi-value { font-size: 1.8rem; font-weight: 700; margin-top: 0.3rem; color: var(--text-main); }
 
-        /* 搜尋與篩選控制面板 */
+        /* 控制面板 */
         .controls-panel { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 1.2rem; }
         .search-box input { width: 100%; padding: 0.8rem 1rem; border: 1.5px solid var(--border-color); border-radius: 8px; font-size: 1rem; outline: none; transition: border 0.2s; }
         .search-box input:focus { border-color: var(--primary-light); }
@@ -51,7 +51,7 @@
         .filter-btn:hover { background: #f1f5f9; }
         .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: 600; }
 
-        /* 課程網格卡片 */
+        /* 課程網格 */
         .course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem; }
         .course-card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
         .course-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08); }
@@ -78,4 +78,344 @@
         /* 報名人數專用樣式 */
         .reg-stats-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.6rem 0.8rem; border-radius: 8px; margin: 0.4rem 0; }
         .reg-stats-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 600; }
-        .reg-badge { font-size: 0.72rem; padding: 0.15rem 0.
+        .reg-badge { font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; }
+        .reg-badge.full { background: #fee2e2; color: #b91c1c; }
+        .reg-badge.hot { background: #fffbeb; color: #b45309; }
+        .reg-badge.normal { background: #f1f5f9; color: #475569; }
+
+        .hotword-group { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+        .hotword-tag { background: #f1f5f9; color: #475569; font-size: 0.72rem; padding: 0.18rem 0.48rem; border-radius: 4px; }
+
+        .card-footer { padding: 0.75rem 1.25rem 1.25rem; }
+        .detail-btn { display: block; text-align: center; background: var(--primary); color: white; text-decoration: none; padding: 0.65rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
+        .detail-btn:hover { background: var(--primary-light); }
+
+        .no-result, .loading-state, .error-state { grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; }
+        .error-state { color: #dc2626; background: #fef2f2; border-radius: 12px; border: 1px solid #fecaca; }
+        .app-footer { text-align: center; padding: 2rem 1rem; font-size: 0.85rem; color: var(--text-muted); }
+        .app-footer a { color: var(--primary-light); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-content">
+            <h1>🎓 北基宜花金馬分署 職訓課程報名追蹤</h1>
+            <p class="subtitle">現場即時讀取最純粹的自辦職前訓練與在職訓練招生人數</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- KPI 數據看板 -->
+        <section class="kpi-grid">
+            <div class="kpi-card total">
+                <div class="kpi-title">總追蹤課程</div>
+                <div class="kpi-value" id="kpi-total">0</div>
+            </div>
+            <div class="kpi-card open">
+                <div class="kpi-title">開放報名中</div>
+                <div class="kpi-value" id="kpi-open">0</div>
+            </div>
+            <div class="kpi-card urgent">
+                <div class="kpi-title">即將截止 (≤7天)</div>
+                <div class="kpi-value" id="kpi-urgent">0</div>
+            </div>
+            <div class="kpi-card pre">
+                <div class="kpi-title">職前訓練班 (含青年)</div>
+                <div class="kpi-value" id="kpi-pre">0</div>
+            </div>
+            <div class="kpi-card in-service">
+                <div class="kpi-title">在職訓練班</div>
+                <div class="kpi-value" id="kpi-inservice">0</div>
+            </div>
+        </section>
+
+        <!-- 控制面板 -->
+        <section class="controls-panel">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 搜尋課程名稱、關鍵技術 (如：AI、PLC、Solidworks、水電)...">
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-label">訓練場地：</div>
+                <div class="btn-group" id="locationFilters">
+                    <button class="filter-btn active" data-location="ALL">全部場地</button>
+                    <button class="filter-btn" data-location="泰山">泰山場</button>
+                    <button class="filter-btn" data-location="五股">五股場</button>
+                    <button class="filter-btn" data-location="基隆">基隆場</button>
+                    <button class="filter-btn" data-location="宜蘭">宜蘭場</button>
+                    <button class="filter-btn" data-location="花蓮">花蓮場</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-label">班別型態：</div>
+                <div class="btn-group" id="typeFilters">
+                    <button class="filter-btn active" data-type="ALL">全部班別</button>
+                    <button class="filter-btn" data-type="PRE">職前訓練 (含青年)</button>
+                    <button class="filter-btn" data-type="IN">在職訓練</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 課程卡片容器 -->
+        <main id="course-container" class="course-grid">
+            <div class="loading-state">🔄 正在連線讀取真實爬蟲資料 (courses.json)...</div>
+        </main>
+    </div>
+
+    <footer class="app-footer">
+        <p>資料來源：<a href="https://course.taiwanjobs.gov.tw/" target="_blank">勞動力發展署 台灣就業通-職訓整合網</a></p>
+        <p id="update-timestamp">資料更新狀態載入中...</p>
+    </footer>
+
+    <script>
+        let allCourses = [];
+        let currentLocationFilter = 'ALL';
+        let currentTypeFilter = 'ALL';
+        let searchQuery = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 💡 100% 現場連線讀取，並加上時間戳記（?t=...）強制瀏覽器繞過快取，拿到最真實的新檔案
+            fetch('courses.json?t=' + new Date().getTime())
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP 錯誤狀態碼 ${res.status}。確認 courses.json 已正確生成。`);
+                    
+                    const lastMod = res.headers.get('Last-Modified');
+                    if (lastMod) {
+                        document.getElementById('update-timestamp').innerText = `最後更新時間：${new Date(lastMod).toLocaleString('zh-TW')}`;
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    // 自動兼容 Dict {rows: [...]} 或 List [...] 結構
+                    let parsed = [];
+                    if (Array.isArray(data)) {
+                        parsed = data;
+                    } else if (data && Array.isArray(data.rows)) {
+                        parsed = data.rows;
+                    }
+
+                    if (parsed.length === 0) {
+                        throw new Error("courses.json 格式正確但裡面的課程清單為 0 筆。");
+                    }
+
+                    allCourses = parsed;
+                    console.log('✅ 真實資料解析成功，共', allCourses.length, '門課程。');
+                    
+                    // 初始化看板
+                    updateKPIs(allCourses);
+                    renderCourses();
+                })
+                .catch(err => {
+                    console.error('❌ 載入失敗:', err);
+                    document.getElementById('course-container').innerHTML = `
+                        <div class="error-state">
+                            <p><strong>⚠️ 無法動態讀取課程資料 (courses.json)</strong></p>
+                            <p style="font-size:0.9rem; margin-top:0.6rem; color:#ef4444;">失敗原因：${err.message}</p>
+                            <p style="font-size:0.85rem; margin-top:0.4rem; color:var(--text-muted);">請確認 courses.json 是否已正確生成並在專案根目錄中，或嘗試重新手動啟動爬蟲任務。</p>
+                        </div>
+                    `;
+                    document.getElementById('update-timestamp').innerText = "資料連線失敗";
+                });
+
+            // 搜尋監聽
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                searchQuery = e.target.value.trim().toLowerCase();
+                renderCourses();
+            });
+
+            // 地點篩選
+            document.getElementById('locationFilters').addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    document.querySelectorAll('#locationFilters .filter-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentLocationFilter = e.target.getAttribute('data-location');
+                    renderCourses();
+                }
+            });
+
+            // 班別篩選
+            document.getElementById('typeFilters').addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    document.querySelectorAll('#typeFilters .filter-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentTypeFilter = e.target.getAttribute('data-type');
+                    renderCourses();
+                }
+            });
+        });
+
+        function isPreEmployment(course) {
+            const typeName = course.CourseTypeName || '';
+            const planName = course.PlanName || '';
+            return typeName.includes('職前') || typeName.includes('青年') || planName.includes('職前') || planName.includes('青年');
+        }
+
+        function isInService(course) {
+            const typeName = course.CourseTypeName || '';
+            const planName = course.PlanName || '';
+            return typeName.includes('在職') || planName.includes('在職');
+        }
+
+        function updateKPIs(courses) {
+            const now = new Date();
+            let openCount = 0;
+            let urgentCount = 0;
+            let preCount = 0;
+            let inServiceCount = 0;
+
+            courses.forEach(c => {
+                if (isPreEmployment(c)) preCount++;
+                if (isInService(c)) inServiceCount++;
+
+                if (c.RegisterEndDateTime) {
+                    const deadline = new Date(c.RegisterEndDateTime);
+                    const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 0) {
+                        openCount++;
+                        if (diffDays <= 7) urgentCount++;
+                    }
+                }
+            });
+
+            document.getElementById('kpi-total').innerText = courses.length;
+            document.getElementById('kpi-open').innerText = openCount;
+            document.getElementById('kpi-urgent').innerText = urgentCount;
+            document.getElementById('kpi-pre').innerText = preCount;
+            document.getElementById('kpi-inservice').innerText = inServiceCount;
+        }
+
+        function renderCourses() {
+            const container = document.getElementById('course-container');
+            const now = new Date();
+
+            const filtered = allCourses.filter(c => {
+                const locMatch = (currentLocationFilter === 'ALL') || 
+                                 (c.Address && c.Address.includes(currentLocationFilter)) || 
+                                 (c.Name && c.Name.includes(currentLocationFilter)) ||
+                                 (c.CourseLocation && c.CourseLocation.includes(currentLocationFilter));
+
+                let typeMatch = true;
+                if (currentTypeFilter === 'PRE') {
+                    typeMatch = isPreEmployment(c);
+                } else if (currentTypeFilter === 'IN') {
+                    typeMatch = isInService(c);
+                }
+
+                const text = `${c.Name || ''} ${c.HOTWORD || ''} ${c.Category || ''} ${c.Address || ''}`.toLowerCase();
+                const searchMatch = !searchQuery || text.includes(searchQuery);
+
+                return locMatch && typeMatch && searchMatch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="no-result">查無相符課程，請嘗試切換篩選條件。</div>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => {
+                let statusBadge = '';
+                let daysLeftText = '';
+                if (c.RegisterEndDateTime) {
+                    const deadline = new Date(c.RegisterEndDateTime);
+                    const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                        statusBadge = '<span class="status-badge closed">已截止</span>';
+                        daysLeftText = '報名已結束';
+                    } else if (diffDays <= 3) {
+                        statusBadge = '<span class="status-badge urgent">即將截止 🚨</span>';
+                        daysLeftText = `剩餘 <strong>${diffDays}</strong> 天截止！`;
+                    } else if (diffDays <= 7) {
+                        statusBadge = '<span class="status-badge warning">倒數中 ⏳</span>';
+                        daysLeftText = `剩餘 <strong>${diffDays}</strong> 天截止`;
+                    } else {
+                        statusBadge = '<span class="status-badge open">報名中 ✅</span>';
+                        daysLeftText = `剩餘 ${diffDays} 天報名期`;
+                    }
+                }
+
+                const isPre = isPreEmployment(c);
+                const displayTypeName = isPre ? "職前訓練" : "在職訓練";
+                const typeClass = isPre ? 'tag-pre' : 'tag-in';
+
+                // 報名人數渲染 (當爬蟲解析出 RegLimit 及 RegCount 時展示)
+                let regStatsHtml = '';
+                if (c.RegLimit && c.RegLimit !== '不限' && c.RegLimit !== '未提供') {
+                    const limit = c.RegLimit;
+                    const count = c.RegCount;
+                    const urgency = c.RegUrgency || '正常';
+                    
+                    let badgeClass = 'normal';
+                    let badgeLabel = '正常招生';
+                    if (urgency === '已額滿') {
+                        badgeClass = 'full';
+                        badgeLabel = '已額滿 🚨';
+                    } else if (urgency === '競爭激烈') {
+                        badgeClass = 'hot';
+                        badgeLabel = '競爭激烈 🔥';
+                    }
+
+                    regStatsHtml = `
+                        <div class="reg-stats-box">
+                            <div class="reg-stats-header">
+                                <span>🔥 目前報名：<strong style="color:var(--primary); font-size:1rem;">${count}</strong> 人 (限額 ${limit} 人)</span>
+                                <span class="reg-badge ${badgeClass}">${badgeLabel}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    regStatsHtml = `
+                        <div class="reg-stats-box">
+                            <div class="reg-stats-header" style="color:var(--text-muted); font-size:0.8rem;">
+                                <span>分署自辦在職訓練（請點擊報名鈕查看詳細餘額）</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                let hotwordHtml = '';
+                if (c.HOTWORD) {
+                    const tags = c.HOTWORD.split(/[,、]/).slice(0, 4);
+                    hotwordHtml = tags.map(t => `<span class="hotword-tag">${t.trim()}</span>`).join('');
+                }
+
+                const regStart = c.RegisterStartDateTime ? c.RegisterStartDateTime.split('T')[0] : '';
+                const regEnd = c.RegisterEndDateTime ? c.RegisterEndDateTime.split('T')[0] : '';
+
+                return `
+                    <div class="course-card">
+                        <div class="card-header">
+                            <span class="type-tag ${typeClass}">${displayTypeName}</span>
+                            ${statusBadge}
+                        </div>
+                        <h3 class="course-name">${c.Name}</h3>
+                        
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="info-label">📍 上課地點：</span>
+                                <span class="info-value">${c.CityName || ''} - ${c.Address || '依簡章為準'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">📅 報名期間：</span>
+                                <span class="info-value">${regStart} ~ ${regEnd}</span>
+                            </div>
+                            
+                            ${regStatsHtml}
+
+                            <div class="urgency-row">
+                                ⏱️ ${daysLeftText}
+                            </div>
+                            ${hotwordHtml ? `<div class="hotword-group">${hotwordHtml}</div>` : ''}
+                        </div>
+
+                        <div class="card-footer">
+                            <a href="${c.Url}" target="_blank" class="detail-btn">查看官方簡章 / 立即報名 ➔</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
