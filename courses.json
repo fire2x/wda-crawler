@@ -42,7 +42,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "室內設計"
+    "HOTWORD": "室內設計",
+    "RegLimit": "不限",
+    "RegCount": "不限",
+    "RegUrgency": "在職班"
   },
   {
     "IsCollect": false,
@@ -87,7 +90,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "珠寶繪圖、設計、珠寶、首飾"
+    "HOTWORD": "珠寶繪圖、設計、珠寶、首飾",
+    "RegLimit": "不限",
+    "RegCount": "不限",
+    "RegUrgency": "在職班"
   },
   {
     "IsCollect": false,
@@ -132,7 +138,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "PLC、可程式控制器,PLC工程師,三菱、omron,人機介面,伺服馬達、變頻馬達,機械手臂、自走車,機電整合工程師,步進馬達、HMI,氣壓、類比數位通訊,自動控制、機電整合,電控工程師,自動化工程師"
+    "HOTWORD": "PLC、可程式控制器,PLC工程師,三菱、omron,人機介面,伺服馬達、變頻馬達,機械手臂、自走車,機電整合工程師,步進馬達、HMI,氣壓、類比數位通訊,自動控制、機電整合,電控工程師,自動化工程師",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -177,7 +186,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "手繪、AI、繪圖,Solidworks,3D、2D、立體,模型、AutoCAD,立體圖,3D列印,電腦輔助立體製圖,零件圖、組合圖,國際證照、尺寸圖"
+    "HOTWORD": "手繪、AI、繪圖,Solidworks,3D、2D、立體,模型、AutoCAD,立體圖,3D列印,電腦輔助立體製圖,零件圖、組合圖,國際證照、尺寸圖",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -222,7 +234,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "物聯網,AI,MCU,軟體,開發,數位電子,電路,PCB,系統,數位設計,CPLD,數位設計"
+    "HOTWORD": "物聯網,AI,MCU,軟體,開發,數位電子,電路,PCB,系統,數位設計,CPLD,數位設計",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -267,7 +282,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "用戶用電、自來水配管,室內配線、建築、電機,電工、水電、自來水,配管、配線、電力,台電、控制、電氣"
+    "HOTWORD": "用戶用電、自來水配管,室內配線、建築、電機,電工、水電、自來水,配管、配線、電力,台電、控制、電氣",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -312,7 +330,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "室內配線,水電,機電,電機"
+    "HOTWORD": "室內配線,水電,機電,電機",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -357,7 +378,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "數位影音,行銷"
+    "HOTWORD": "數位影音,行銷",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -402,7 +426,10 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "PHOTOSHOP,數位圖文,商品包裝,品牌包裝"
+    "HOTWORD": "PHOTOSHOP,數位圖文,商品包裝,品牌包裝",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   },
   {
     "IsCollect": false,
@@ -447,6 +474,9 @@
     "ONSHELLDATE": null,
     "NTPSNo": null,
     "NTPName": null,
-    "HOTWORD": "珠寶、飾品、金工,首飾、銀飾、設計"
+    "HOTWORD": "珠寶、飾品、金工,首飾、銀飾、設計",
+    "RegLimit": "未提供",
+    "RegCount": "未提供",
+    "RegUrgency": "正常"
   }
 ]

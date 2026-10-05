@@ -1,12 +1,14 @@
 import requests
 import json
 import time
+import re
 import os
 
-# 台灣就業通 職訓課程核心分頁查詢 API
-URL = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+# 1. API 與網頁端點
+API_URL = "https://course.taiwanjobs.gov.tw/api/Course/paging"
+DETAIL_BASE_URL = "https://its.taiwanjobs.gov.tw/Course/Detail"
 
-# 完整的瀏覽器特徵偽裝標頭 (完全比照 Chrome 發送 AJAX 請求)
+# 完整的瀏覽器特徵偽裝標頭
 HEADERS = {
     "Content-Type": "application/json;charset=UTF-8",
     "Accept": "application/json, text/plain, */*",
@@ -14,124 +16,146 @@ HEADERS = {
     "Origin": "https://course.taiwanjobs.gov.tw",
     "Referer": "https://course.taiwanjobs.gov.tw/course/conditions",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "X-Requested-With": "XMLHttpRequest",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin"
+    "X-Requested-With": "XMLHttpRequest"
 }
 
-def fetch_page_with_retry(session, page_index, max_retries=3):
-    """
-    帶有自動重試機制的單頁請求函式，應對海外 IP 可能的連線逾時或暫時性阻擋
-    """
+def fetch_page_list(session, page_index):
+    """ 第一階段：抓取列表資料 """
     payload = {
         "PageIndex": page_index,
         "pageIndex": page_index,
         "PageSize": 10,
         "pageSize": 10,
         "TrainingUnit": "北基宜花金馬分署",
-        "Keyword": "",
-        "CourseType": None,
-        "City": None
+        "Keyword": "", "CourseType": None, "City": None
     }
+    try:
+        response = session.post(API_URL, json=payload, headers=HEADERS, timeout=20)
+        if response.status_code == 200:
+            data = response.json()
+            return data if isinstance(data, list) else data.get("rows", [])
+    except Exception as e:
+        print(f"⚠️ [列表第 {page_index} 頁] 請求失敗: {e}")
+    return []
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            print(f"📡 [第 {page_index} 頁] 發送請求 (嘗試 {attempt}/{max_retries})...")
-            # 設定 25 秒超時，給予跨國網路足夠時間回應
-            response = session.post(URL, json=payload, headers=HEADERS, timeout=25)
+def scrape_registration_stats(session, course_id):
+    """ 
+    第二階段：深度爬網。進入詳細網頁提取「目前一般訓練報名人數」與「招生名額」。
+    因為部分班別可能是在職訓練班（版面不同或在職訓練網），此處加上安全容錯處理。
+    """
+    detail_url = f"{DETAIL_BASE_URL}?ID={course_id}"
+    stats = {
+        "RegLimit": "未提供",       # 招生名額
+        "RegCount": "未提供",       # 目前一般訓練報名人數
+        "RegUrgency": "正常"       # 報名急迫度
+    }
+    
+    try:
+        # 使用 Session 發送 GET 請求取得詳細頁 HTML
+        resp = session.get(detail_url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return stats
             
-            if response.status_code == 200:
-                data = response.json()
-                rows = []
-                if isinstance(data, list):
-                    rows = data
-                elif isinstance(data, dict):
-                    rows = data.get("rows", [])
-                
-                print(f"✅ [第 {page_index} 頁] 成功取得 {len(rows)} 筆原始資料")
-                return rows
-            else:
-                print(f"⚠️ [第 {page_index} 頁] 狀態碼異常: {response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            print(f"⏳ [第 {page_index} 頁] 連線逾時 (Timeout)，等待重試...")
-        except Exception as e:
-            print(f"❌ [第 {page_index} 頁] 連線錯誤: {e}")
-            
-        time.sleep(2 * attempt) # 每次失敗遞增等待時間 (2秒、4秒、6秒)
+        html = resp.text
 
-    return None
+        # 💡 使用高效的正規表示式 (Regular Expression) 精準定位表格內容
+        # 1. 查找「招生名額」
+        limit_match = re.search(r"招生名額.*?<td>\s*(\d+)\s*人", html, re.DOTALL)
+        if limit_match:
+            stats["RegLimit"] = int(limit_match.group(1))
 
-def fetch_all_courses():
+        # 2. 查找「目前一般訓練報名人數」
+        count_match = re.search(r"目前一般訓練報名人數.*?<td>\s*(\d+)\s*人", html, re.DOTALL)
+        if count_match:
+            stats["RegCount"] = int(count_match.group(1))
+
+        # 3. 智能計算報名急迫度 (報名人數超過招生名額 80% 即判定為「競爭激烈」)
+        if isinstance(stats["RegLimit"], int) and isinstance(stats["RegCount"], int):
+            ratio = stats["RegCount"] / stats["RegLimit"]
+            if ratio >= 1.0:
+                stats["RegUrgency"] = "已額滿"
+            elif ratio >= 0.8:
+                stats["RegUrgency"] = "競爭激烈"
+            elif ratio >= 0.5:
+                stats["RegUrgency"] = "名額緊張"
+
+    except Exception as e:
+        print(f"   ⚠️ 深度解析課程 {course_id} 時出錯: {e}")
+        
+    return stats
+
+def fetch_all_courses_with_details():
     session = requests.Session()
     all_raw_courses = []
     
-    # 步驟 1: 預先訪問首頁獲取伺服器 Session Cookie
-    print("🌐 步驟 1: 正在預先訪問就業通首頁建立 Session...")
+    # 造訪首頁初始化 Cookie
     try:
-        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=15)
-        print("✅ 成功獲取首頁 Session Cookie！")
-    except Exception as e:
-        print(f"⚠️ 首頁造訪逾時 (可能是海外 IP 限制)，將直接嘗試 API 請求: {e}")
+        session.get("https://course.taiwanjobs.gov.tw/course/conditions", headers=HEADERS, timeout=10)
+    except Exception:
+        pass
 
-    # 步驟 2: 分別抓取 Page 1 與 Page 2 (北基宜花金馬分署的課程通常在 2 頁以內)
-    print("\n🚀 步驟 2: 開始循序抓取所有分頁課程...")
+    # 一、抓取全部列表
+    print("🌐 階段一：正在抓取北基宜花金馬分署所有課程列表...")
     for page in [1, 2, 3]:
-        rows = fetch_page_with_retry(session, page)
-        
-        # 如果該頁拿到了資料，加入總表
-        if rows:
-            all_raw_courses.extend(rows)
-            # 如果回傳筆數小於 10 筆，代表已經是最後一頁了，提早結束
-            if len(rows) < 10:
-                print(f"🏁 第 {page} 頁筆數小於 10 筆，確認已達最後一頁。")
-                break
-        else:
-            # 若第一頁就完全拿不到資料 (可能徹底被海外防火牆擋死)，中斷避免浪費時間
-            if page == 1:
-                print("❌ 第一頁完全無法取得資料，中止後續分頁爬取。")
-                break
-            else:
-                print(f"ℹ️ 第 {page} 頁無更多資料，結束爬取。")
-                break
-                
-        time.sleep(1.5)
+        rows = fetch_page_list(session, page)
+        if not rows:
+            break
+        all_raw_courses.extend(rows)
+        if len(rows) < 10:
+            break
+        time.sleep(1)
 
-    # 步驟 3: 精準去重 (排除重複登記的青年專班，只留最純淨的班別)
-    print(f"\n🔍 步驟 3: 開始對抓取到的 {len(all_raw_courses)} 筆原始課程進行去重...")
-    unique_courses = {}
+    # 去重
+    unique_map = {}
     for item in all_raw_courses:
         course_name = (item.get("Name") or "").strip()
         address = (item.get("Address") or "").strip()
         plan_name = (item.get("PlanName") or "").strip()
-        
-        # 💡 使用 指紋簽章 (課程名稱 + 計畫 + 地址) 去除重複上架的案件
-        signature = f"{course_name}@{plan_name}@{address}"
-        
-        # 優先使用 ID 作為鍵值
-        key = item.get("ID") or item.get("SourcePrimaryKey") or signature
-        if signature not in unique_courses:
-            unique_courses[signature] = item
+        sig = f"{course_name}@{plan_name}@{address}"
+        if sig not in unique_map:
+            unique_map[sig] = item
+            
+    clean_courses = list(unique_map.values())
+    print(f"✅ 成功撈出 {len(clean_courses)} 門不重複課程，準備進入深度報名人數解析...")
 
-    clean_courses = list(unique_courses.values())
-    print(f"✨ 去重完成！最終獲得 {len(clean_courses)} 門不重複的完整課程！")
+    # 二、深度抓取每個班級的報名人數
+    print("\n🚀 階段二：開始逐一探訪課程詳細頁面，解析【一般訓練報名人數】...")
+    for idx, course in enumerate(clean_courses, 1):
+        course_id = course.get("ID") or course.get("SourcePrimaryKey")
+        course_name = course.get("Name")
+        
+        # 💡 只有「職前」訓練與「青年」專班才擁有該招生詳細頁面結構
+        is_pre = "職前" in (course.get("CourseTypeName") or "") or "青年" in (course.get("CourseTypeName") or "") or "職前" in (course.get("PlanName") or "")
+        
+        if course_id and is_pre:
+            print(f"   [{idx}/{len(clean_courses)}] 正在解析「{course_name[:12]}...」的報名統計...")
+            stats = scrape_registration_stats(session, course_id)
+            
+            # 將爬取到的數據，動態融合進該課程物件中
+            course["RegLimit"] = stats["RegLimit"]
+            course["RegCount"] = stats["RegCount"]
+            course["RegUrgency"] = stats["RegUrgency"]
+            
+            # 友善間隔，防範被政府主機阻擋 IP
+            time.sleep(1.2)
+        else:
+            # 在職訓練不在此統計範圍內，給予預設值
+            course["RegLimit"] = "不限"
+            course["RegCount"] = "不限"
+            course["RegUrgency"] = "在職班"
+
     return clean_courses
 
 def main():
-    courses = fetch_all_courses()
+    courses = fetch_all_courses_with_details()
     filename = "courses.json"
     
-    # 💡 【終極安全寫入防護】：
-    # 只有在「真正抓取到大於 0 筆資料」時，才覆蓋 courses.json！
-    # 這樣一來，即使偶爾遇到網路斷線或海外逾時，也不會把原本正常的資料庫覆蓋成空檔案！
     if len(courses) > 0:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(courses, f, ensure_ascii=False, indent=2)
-        print(f"\n💾 成功將 {len(courses)} 門課程寫入 {filename} (檔案大小: {os.path.getsize(filename)} bytes)")
+        print(f"\n🎉 任務完美達成！已將包含【一般訓練報名人數】的 {len(courses)} 門課程寫入 {filename}")
     else:
-        print("\n⚠️ 警告：本次爬取結果為 0 筆！")
-        print("   啟動安全防護機制：保留原有 courses.json 檔案不予覆蓋，防止網頁變成空白。")
+        print("\n⚠️ 抓取失敗，為保護網頁，不覆蓋舊 courses.json。")
 
 if __name__ == "__main__":
     main()
